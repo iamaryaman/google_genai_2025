@@ -8,7 +8,7 @@ class Config {
 
     loadConfig() {
         // Get API key from environment variables (set in Firebase/Netlify/Vercel)
-        this.GEMINI_API_KEY = this.getEnvVar('GEMINI_API_KEY', '');
+        this.GEMINI_API_KEY = "AIzaSyDvuzgxHFG9XLMj0lF0DGoasVt1JE7ZjRI";
         this.API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.GEMINI_API_KEY}`;
         
         // Application info
