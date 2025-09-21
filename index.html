@@ -1,0 +1,1609 @@
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAD AI - Legal Document Analysis Platform</title>
+    <link rel="icon" href="LOGO.svg" type="image/svg+xml">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #222222;
+            --bg-glass: rgba(190, 82, 242, 0.1);
+            --purple: #BE52F2;
+            --teal: #48D1CC;
+            --white: #ffffff;
+            --gray: #666666;
+            --glass-blur: 20px;
+            --border-radius: 12px;
+            --shadow: 0 8px 32px rgba(0,0,0,0.3);
+            --transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            --vh: 1vh; /* Custom viewport height unit */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg-primary);
+            background-image: radial-gradient(circle at 20% 80%, rgba(190, 82, 242, 0.3) 0%, transparent 50%), 
+                              radial-gradient(circle at 80% 20%, rgba(240, 240, 240, 0.3) 0%, transparent 50%);
+            color: var(--white);
+            overflow-x: hidden;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        #app {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            height: 100vh;
+            gap: 1rem;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+
+        .panel {
+            background: var(--bg-glass);
+            backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+
+        #viewer {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .viewer-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            height: 70px;
+            border-radius: 50%;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .upload-btn, .analyze-btn {
+            background: var(--purple);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .analyze-btn {
+            background: var(--teal);
+        }
+
+        .upload-btn:hover, .analyze-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .upload-btn:hover {
+            background: #9b42c7;
+        }
+        
+        .analyze-btn:hover {
+            background: #36b8b3;
+        }
+        
+        .document-issue {
+            background-color: rgba(255, 0, 0, 0.2);
+            border-bottom: 2px solid #ff4444;
+            padding: 2px 4px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .document-issue:hover {
+            background-color: rgba(255, 0, 0, 0.3);
+        }
+        
+        .issue-tooltip {
+            position: absolute;
+            background: #ff4444;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1001;
+            display: none;
+            max-width: 200px;
+            word-wrap: break-word;
+        }
+
+        .document-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            line-height: 1.8;
+            font-size: 16px;
+            user-select: text;
+        }
+
+        .document-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .document-content::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+
+        .document-content::-webkit-scrollbar-thumb {
+            background: var(--purple);
+            border-radius: 4px;
+        }
+
+        .placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            color: var(--gray);
+        }
+
+        .placeholder svg {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 2rem;
+            opacity: 0.5;
+        }
+
+        #chat {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .chat-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--purple);
+        }
+
+        .messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            animation: slideIn 0.3s ease;
+            position: relative;
+        }
+
+        .message.user {
+            background: var(--teal);
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .message.ai {
+            background: rgba(190, 82, 242, 0.2);
+            border: 1px solid rgba(190, 82, 242, 0.3);
+            align-self: flex-start;
+        }
+
+        .message-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            opacity: 0;
+            transition: var(--transition);
+        }
+
+        .message.ai:hover .message-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: var(--white);
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .action-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .chat-input {
+            padding: 1rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .input-field {
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: white;
+            font-family: inherit;
+            resize: none;
+            min-height: 40px;
+            max-height: 120px;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--purple);
+        }
+
+        .send-btn {
+            background: var(--purple);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 44px;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: #9b42c7;
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .drag-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(190, 82, 242, 0.2);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border: 3px dashed var(--purple);
+            margin: 2rem;
+            border-radius: var(--border-radius);
+        }
+
+        .drag-overlay.active {
+            display: flex;
+        }
+
+        .selection-popup {
+            position: fixed;
+            background: var(--bg-glass);
+            backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 0.75rem;
+            z-index: 1000;
+            display: none;
+            box-shadow: var(--shadow);
+            white-space: nowrap;
+        }
+
+        .popup-btn {
+            background: var(--teal);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: inherit;
+            margin-right: 0.25rem;
+            transition: var(--transition);
+        }
+        
+        .popup-btn:hover {
+            background: #36b8b3;
+            transform: translateY(-1px);
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--gray);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .loading {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: var(--purple);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .redraft-btn {
+            position: absolute;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--teal);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 56px;
+            height: 56px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            z-index: 10;
+        }
+
+        .redraft-btn:hover {
+            transform: scale(1.1);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            #app {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 1fr;
+                height: 200vh;
+            }
+        }
+
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background: var(--bg-primary);
+            min-width: 120px;
+            box-shadow: var(--shadow);
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            z-index: 10;
+            top: 100%;
+            right: 0;
+        }
+
+        .dropdown-content button {
+            display: block;
+            width: 100%;
+            padding: 0.5rem;
+            background: none;
+            border: none;
+            color: white;
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .dropdown-content button:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .dropdown.active .dropdown-content {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <section id="viewer" class="panel">
+            <div class="viewer-header">
+                <img src="LOGO.svg" alt="RAD AI" class="logo">
+                <div class="header-buttons">
+                    <button class="upload-btn" onclick="triggerFileUpload()">Upload Document</button>
+                    <button class="analyze-btn" id="analyzeBtn" onclick="analyzeDocument()" style="display: none;" aria-label="Analyze document for issues and key clauses">🔍 Analyze Document</button>
+                </div>
+            </div>
+            <div class="document-content" id="documentViewer"><div style="white-space: pre-wrap;">--- Page 1 ---
+Copyright © 20 20   NonDisclosureAgreement.com . All Rights Reserved.   Page   1   of 2  NON - DISCLOSURE AGREEMENT   (NDA)  This Nondisclosure Agreement   or   ("Agreement")   has been   entered into   on the date of  ______________________________ and is   by and between :  Party   Disclosing   Information : ______________________________ with a mailing address of  ____________________________________________________________ (“Disclosing Party”).  Party   Receiving   Information : ______________________________ with a mailing address of  ____________________________________________________________ (“Receiving Party” ) .  F or the purpose of preventing the unauthorized disclosure of Confidential Information as defined  below. The parties agree to enter into a confidential relationship concerning   the disclosure of  certain proprietary and confidential information ("Confidential Information").  1.   Definition of Confidential Information . For purposes of this Agreement, "Confidential  Information" shall include all information or material that has or c ould have commercial value or  other utility in the business in which Disclosing Party is engaged. If Confidential Information is in  written form, the Disclosing Party shall label or stamp the materials with the word "Confidential"  or some similar warning.   If Confidential Information is transmitted orally, the Disclosing Party  shall promptly provide writing indicating that such oral communication constituted Confidential  Information.  2.   Exclusions from Confidential Information . Receiving Party's obligations   under this  Agreement do not extend to information that is: (a) publicly known at the time of disclosure or  subsequently becomes publicly known through no fault of the Receiving Party; (b) discovered or  created by the Receiving Party before disclosure by Di sclosing Party; (c) learned by the  Receiving Party through legitimate means other than from the Disclosing Party or Disclosing  Party's representatives; or (d) is disclosed by Receiving Party with Disclosing Party's prior  written approval.  3.   Obligations of   Receiving Party . Receiving Party shall hold and maintain the Confidential  Information in strictest confidence for the sole and exclusive benefit of the Disclosing Party.  Receiving Party shall carefully restrict access to Confidential Information to employ ees,  contractors and third parties as is reasonably required and shall require those persons to sign  nondisclosure restrictions at least as protective as those in this Agreement. Receiving Party  shall not, without the prior written approval of Disclosing P arty, use for Receiving Party's benefit,  publish, copy, or otherwise disclose to others, or permit the use by others for their benefit or to  the detriment of Disclosing Party, any Confidential Information. Receiving Party shall return to  Disclosing Party a ny and all records, notes, and other written, printed, or tangible materials in its  possession pertaining to Confidential Information immediately if Disclosing Party requests it in  writing.  4.   Time Periods . The nondisclosure provisions of this   Agreement shall survive the termination  of this Agreement and Receiving Party's duty to hold Confidential Information in confidence  shall remain in effect until the Confidential Information no longer qualifies as a trade secret or  until Disclosing Party se nds Receiving Party written notice releasing Receiving Party from this  Agreement, whichever occurs first.
+
+--- Page 2 ---
+Copyright © 20 20   NonDisclosureAgreement.com . All Rights Reserved.   Page   2   of 2  5.   Relationships . Nothing contained in this Agreement shall be deemed to constitute either  party a partner, joint venture   or employee of the other par ty for any purpose.  6.   Severability . If a court finds any provision of this Agreement invalid or unenforceable, the  remainder of this Agreement shall be interpreted so as best to affect the intent of the parties.  7.   Integration . This Agreement expresses t he complete understanding of the parties with  respect to the subject matter and supersedes all prior proposals, agreements, representations,  and understandings. This Agreement may not be amended except in writing signed by both  parties.  8.   Waiver . The fail ure to exercise any right provided in this Agreement shall not be a waiver of  prior or subsequent rights.  9.   Notice of Immunity .   Employee is provided notice that an individual shall not be held  criminally or civilly liable under any federal or state trade   secret law for the disclosure of a trade  secret that is made (i) in confidence to a federal, state, or local government official, either  directly or indirectly, or to an attorney; and (ii) solely for the purpose of reporting or investigating  a suspected vi olation of law; or is made in a complaint or other document filed in a lawsuit or  other proceeding, if such filing is made under seal. An individual who files a lawsuit for  retaliation by an employer for reporting a suspected violation of law may disclose   the trade  secret to the attorney of the individual and use the trade secret information in the court  proceeding, if the individual (i) files any document containing the trade secret under seal; and (ii)  does not disclose the trade secret, except pursuant t o court order.  This Agreement and each party's obligations shall be binding on the representatives, assigns  and successors of such party. Each party has signed this Agreement through its authorized  representative.  DISCLOSING PARTY  Signature :   _____________________________________________________  Typed or Printed Name :   ___________________________   Date: _______________  RECEIVING PARTY  Signature :   _____________________________________________________  Typed or Printed Name :   ___ ________________________   Date: _______________
+
+</div></div>
+            <button class="redraft-btn" onclick="redraftDocument()" style="display: block;" title="Redraft Document">✨</button>
+        </section>
+
+        <section id="chat" class="panel">
+            <div class="chat-header">
+                <h1>RAD AI Assistant</h1>
+                <p style="color: var(--gray); font-size: 14px; margin-top: 0.5rem;">Legal Document Analysis</p>
+            </div>
+            <div class="messages" id="messages"><div class="message user" data-id="1758451714145" data-original-content="tell me about LLP formation in 30 words">
+                <div>tell me about LLP formation in 30 words</div>
+                
+            </div><div class="message ai" data-id="1758451719749" data-original-content="LLP formation involves registering a business as a Limited Liability Partnership, offering liability protection to partners while maintaining partnership flexibility.  Registration requires filing articles of organization with the relevant state authority.
+">
+                <div>LLP का गठन एक व्यवसाय को सीमित देयता भागीदारी (Limited Liability Partnership) के रूप में पंजीकृत करने की प्रक्रिया है, जो भागीदारों को देयता सुरक्षा प्रदान करता है और साथ ही भागीदारी की लचीलापन बनाए रखता है। पंजीकरण के लिए संगठन के लेख (articles of organization) को संबंधित राज्य प्राधिकरण के पास दाखिल करना आवश्यक है।
+</div>
+                
+                    <div class="message-actions">
+                        <button class="action-btn" onclick="speakMessage('1758451719749')" title="Speak">🔊</button>
+                        <div class="dropdown">
+                            <button class="action-btn" onclick="toggleDropdown(this)">Translate ▼</button>
+                            <div class="dropdown-content">
+                                <button onclick="translateMessage('1758451719749', 'hindi')">Hindi</button>
+                                <button onclick="translateMessage('1758451719749', 'tamil')">Tamil</button>
+                                <button onclick="translateMessage('1758451719749', 'bengali')">Bengali</button>
+                            </div>
+                        </div>
+                    </div>
+                
+            </div><div class="message user" data-id="1758452162002" data-original-content="summarise this document in 5 points">
+                <div>summarise this document in 5 points</div>
+                
+            </div><div class="message ai" data-id="1758452170706" data-original-content="Please provide me with the document you would like me to summarize.
+">
+                <div>Please provide me with the document you would like me to summarize.
+</div>
+                
+                    <div class="message-actions">
+                        <button class="action-btn" onclick="speakMessage('1758452170706')" title="Speak">🔊</button>
+                        <div class="dropdown">
+                            <button class="action-btn" onclick="toggleDropdown(this)">Translate ▼</button>
+                            <div class="dropdown-content">
+                                <button onclick="translateMessage('1758452170706', 'hindi')">Hindi</button>
+                                <button onclick="translateMessage('1758452170706', 'tamil')">Tamil</button>
+                                <button onclick="translateMessage('1758452170706', 'bengali')">Bengali</button>
+                            </div>
+                        </div>
+                    </div>
+                
+            </div></div>
+            <div class="chat-input">
+                <textarea class="input-field" id="messageInput" placeholder="Ask a legal question..." rows="1"></textarea>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z"></path>
+                    </svg>
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <div class="drag-overlay" id="dragOverlay">
+        <div style="text-align: center;">
+            <h2>Drop your document here</h2>
+            <p>Supports PDF and TXT files</p>
+        </div>
+    </div>
+
+    <div class="selection-popup" id="selectionPopup" style="display: none; left: 890.463px; top: 372.8px;">
+        <button class="popup-btn" onclick="askAboutSelection()" aria-label="Ask AI about selected text">Ask AI</button>
+        <button class="popup-btn" onclick="speakSelectedText()" style="margin-left: 0.5rem;" aria-label="Read selected text aloud">🔊 Read Aloud</button>
+        <button class="popup-btn" onclick="pauseResumeCurrent()" style="margin-left: 0.5rem; display: none;" id="globalPauseBtn" aria-label="Pause or resume current speech">⏸️</button>
+        <button class="popup-btn" onclick="stopSpeech()" style="margin-left: 0.5rem; display: none;" id="globalStopBtn" aria-label="Stop current speech">⏹️</button>
+    </div>
+
+    <div class="modal" id="queryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Ask About Selection</h3>
+                <button class="close-btn" onclick="closeModal('queryModal')">×</button>
+            </div>
+            <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <strong>Selected Text:</strong>
+                <p id="selectedText" style="margin-top: 0.5rem; font-style: italic;"></p>
+            </div>
+            <textarea class="input-field" id="contextQuery" placeholder="What would you like to know about this text?" rows="3" style="width: 100%; margin-bottom: 1rem;"></textarea>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button class="action-btn" onclick="closeModal('queryModal')">Cancel</button>
+                <button class="upload-btn" onclick="submitContextQuery()">Ask AI</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="redraftModal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3>Redrafted Document</h3>
+                <button class="close-btn" onclick="closeModal('redraftModal')">×</button>
+            </div>
+            <div style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; max-height: 400px; overflow-y: auto; line-height: 1.6;">
+                <div id="redraftedContent"></div>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button class="action-btn" onclick="copyToClipboard()">Copy</button>
+                <button class="upload-btn" onclick="downloadRedraft()">Download</button>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".pdf,.txt" style="display: none;" onchange="handleFileSelect(event)">
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        const API_KEY = 'AIzaSyDvuzgxHFG9XLMj0lF0DGoasVt1JE7ZjRI';
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+        
+        let currentDocument = '';
+        let selectedText = '';
+        let selectedRange = null;
+        let chatHistory = [];
+        let dragCounter = 0;
+        let currentLanguage = 'english'; // Default language
+        let messageTranslations = new Map(); // Store translations
+        let currentUtterance = null; // Track current speech
+        let speechPaused = false; // Track speech state
+        
+        // Enhanced voice mapping for better language support
+        const voiceMapping = {
+            'english': ['en-US', 'en-GB', 'en-AU', 'en'],
+            'hindi': ['hi-IN', 'hi'],
+            'tamil': ['ta-IN', 'ta'],
+            'bengali': ['bn-IN', 'bn']
+        };
+        
+        // Load voices when available
+        function loadVoices() {
+            const voices = speechSynthesis.getVoices();
+            if (voices.length === 0) {
+                setTimeout(loadVoices, 100);
+            }
+        }
+        
+        // Initialize voices
+        speechSynthesis.onvoiceschanged = loadVoices;
+        loadVoices();
+        
+        // Check if speech synthesis is supported
+        const speechSupported = 'speechSynthesis' in window;
+        if (!speechSupported) {
+            console.warn('Speech synthesis not supported in this browser');
+        }
+
+        // File handling
+        function triggerFileUpload() {
+            document.getElementById('fileInput').click();
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        async function processFile(file) {
+            const viewer = document.getElementById('documentViewer');
+            viewer.innerHTML = '<div class="loading"><div class="spinner"></div> Processing document...</div>';
+
+            try {
+                if (file.type === 'text/plain') {
+                    const text = await file.text();
+                    displayDocument(text);
+                } else if (file.type === 'application/pdf') {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                    let fullText = '';
+                    
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        fullText += `--- Page ${i} ---\n${pageText}\n\n`;
+                    }
+                    
+                    displayDocument(fullText);
+                } else {
+                    throw new Error('Unsupported file type');
+                }
+            } catch (error) {
+                viewer.innerHTML = `<div class="placeholder"><p style="color: #ff6b6b;">Error: ${error.message}</p></div>`;
+            }
+        }
+
+        function displayDocument(text) {
+            currentDocument = text;
+            const viewer = document.getElementById('documentViewer');
+            viewer.innerHTML = `<div id="documentText" style="white-space: pre-wrap;">${text}</div>`;
+            document.querySelector('.redraft-btn').style.display = 'block';
+            document.getElementById('analyzeBtn').style.display = 'inline-block';
+        }
+
+        // Drag and drop
+        document.addEventListener('dragenter', handleDragEnter);
+        document.addEventListener('dragleave', handleDragLeave);
+        document.addEventListener('dragover', handleDragOver);
+        document.addEventListener('drop', handleDrop);
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            dragCounter++;
+            document.getElementById('dragOverlay').classList.add('active');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0) {
+                document.getElementById('dragOverlay').classList.remove('active');
+            }
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            dragCounter = 0;
+            document.getElementById('dragOverlay').classList.remove('active');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+        }
+
+        // Text selection - Initialize after DOM loads
+        function initializeTextSelection() {
+            const documentViewer = document.getElementById('documentViewer');
+            if (documentViewer) {
+                documentViewer.addEventListener('mouseup', handleTextSelection);
+                // Allow text selection without interfering with other elements
+                documentViewer.style.userSelect = 'text';
+            }
+        }
+        
+        
+        // Initialize text inputs to ensure they work properly
+        function initializeTextInputs() {
+            const messageInput = document.getElementById('messageInput');
+            const contextQuery = document.getElementById('contextQuery');
+            
+            // Ensure inputs are focusable and editable
+            if (messageInput) {
+                messageInput.style.pointerEvents = 'auto';
+                messageInput.disabled = false;
+                messageInput.readOnly = false;
+            }
+            if (contextQuery) {
+                contextQuery.style.pointerEvents = 'auto';
+                contextQuery.disabled = false;
+                contextQuery.readOnly = false;
+            }
+        }
+        
+        // Initialize on DOM load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTextSelection();
+            initializeTextInputs();
+        });
+        // Also initialize immediately in case DOM is already loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                initializeTextSelection();
+                initializeTextInputs();
+            });
+        } else {
+            initializeTextSelection();
+            initializeTextInputs();
+        }
+
+        function handleTextSelection(e) {
+            // Only handle selections within the document viewer
+            if (!e.target.closest('#documentViewer')) {
+                return;
+            }
+            
+            // Small delay to ensure selection is complete
+            setTimeout(() => {
+                const selection = window.getSelection();
+                const selectedString = selection.toString().trim();
+                
+                // Double-check the selection is within document viewer
+                if (selectedString.length > 3 && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    const container = range.commonAncestorContainer;
+                    const documentViewer = document.getElementById('documentViewer');
+                    
+                    // Only show popup if selection is within document viewer
+                    if (documentViewer && (documentViewer.contains(container) || container === documentViewer)) {
+                        selectedText = selectedString;
+                        selectedRange = range;
+                        
+                        const rect = range.getBoundingClientRect();
+                        const popup = document.getElementById('selectionPopup');
+                        
+                        // Position popup relative to viewport
+                        popup.style.display = 'block';
+                        popup.style.position = 'fixed';
+                        popup.style.left = Math.min(rect.right + 10, window.innerWidth - 200) + 'px';
+                        popup.style.top = Math.max(10, rect.top - 10) + 'px';
+                        popup.style.zIndex = '1000';
+                        
+                        console.log('Text selected:', selectedString); // Debug log
+                    }
+                } else {
+                    document.getElementById('selectionPopup').style.display = 'none';
+                }
+            }, 100);
+        }
+
+        function askAboutSelection() {
+            document.getElementById('selectedText').textContent = selectedText;
+            document.getElementById('selectionPopup').style.display = 'none';
+            document.getElementById('queryModal').classList.add('active');
+        }
+
+        // Chat functionality
+        const messageInput = document.getElementById('messageInput');
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const input = messageInput.value.trim();
+            if (!input) return;
+
+            addMessage('user', input);
+            messageInput.value = '';
+            document.getElementById('sendBtn').disabled = true;
+
+            try {
+                const response = await callGeminiAPI(input);
+                addMessage('ai', response);
+            } catch (error) {
+                addMessage('ai', 'Sorry, I encountered an error. Please try again.');
+            } finally {
+                document.getElementById('sendBtn').disabled = false;
+            }
+        }
+
+        async function submitContextQuery() {
+            const query = document.getElementById('contextQuery').value.trim();
+            if (!query) return;
+
+            closeModal('queryModal');
+            addMessage('user', `About "${selectedText.substring(0, 50)}...": ${query}`);
+
+            try {
+                const response = await callGeminiAPI(query, selectedText);
+                addMessage('ai', response);
+            } catch (error) {
+                addMessage('ai', 'Sorry, I encountered an error analyzing the selected text.');
+            }
+        }
+
+        function addMessage(type, content, isTranslated = false) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const messageId = Date.now().toString();
+            messageDiv.innerHTML = `
+                <div>${content}</div>
+                ${type === 'ai' ? `
+                    <div class="message-actions">
+                        <button class="action-btn" onclick="speakMessage('${messageId}')" title="Speak" aria-label="Read message aloud">🔊</button>
+                        <button class="action-btn" onclick="pauseResumeMessage('${messageId}')" title="Pause/Resume" aria-label="Pause or resume speech" id="pauseBtn-${messageId}" style="display: none;">⏸️</button>
+                        <button class="action-btn" onclick="stopSpeech()" title="Stop" aria-label="Stop speech" id="stopBtn-${messageId}" style="display: none;">⏹️</button>
+                        <div class="dropdown">
+                            <button class="action-btn" onclick="toggleDropdown(this)">Translate ▼</button>
+                            <div class="dropdown-content">
+                                <button onclick="translateMessage('${messageId}', 'english')">English</button>
+                                <button onclick="translateMessage('${messageId}', 'hindi')">Hindi</button>
+                                <button onclick="translateMessage('${messageId}', 'tamil')">Tamil</button>
+                                <button onclick="translateMessage('${messageId}', 'bengali')">Bengali</button>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+            
+            messageDiv.dataset.id = messageId;
+            messageDiv.dataset.originalContent = content;
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+
+            if (type === 'user') {
+                chatHistory.push({role: 'user', content});
+            } else {
+                chatHistory.push({role: 'assistant', content});
+            }
+
+            // Keep only last 5 exchanges to minimize tokens
+            if (chatHistory.length > 10) {
+                chatHistory = chatHistory.slice(-10);
+            }
+        }
+
+        async function callGeminiAPI(query, context = null) {
+            const messages = [
+                {
+                    role: 'system',
+                    parts: [{text: 'You are RAD AI, a legal assistant. Provide concise, accurate legal information. Be direct and professional.'}]
+                }
+            ];
+
+            // Add document context if available
+            if (currentDocument) {
+                messages.push({
+                    role: 'user',
+                    parts: [{text: `Here is the document content for reference:\n\n${currentDocument}`}]
+                });
+                messages.push({
+                    role: 'model',
+                    parts: [{text: 'I have reviewed the document and will use it to answer your questions.'}]
+                });
+            }
+
+            // Add recent chat history (last 3 exchanges max)
+            const recentHistory = chatHistory.slice(-6);
+            recentHistory.forEach(msg => {
+                messages.push({
+                    role: msg.role === 'user' ? 'user' : 'model',
+                    parts: [{text: msg.content}]
+                });
+            });
+
+            let userQuery = query;
+            if (context) {
+                userQuery = `Context from document: "${context}"\n\nQuestion: ${query}`;
+            } else if (currentDocument && query.toLowerCase().includes('document') || query.toLowerCase().includes('summarise') || query.toLowerCase().includes('summarize')) {
+                userQuery = `Based on the uploaded document, ${query}`;
+            }
+
+            messages.push({
+                role: 'user',
+                parts: [{text: userQuery}]
+            });
+
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    contents: messages.slice(1), // Remove system message for Gemini
+                    generationConfig: {
+                        temperature: 0.7,
+                        maxOutputTokens: 300, // Limit output to save tokens
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+        }
+
+        // Translation
+        async function translateMessage(messageId, language) {
+            const messageDiv = document.querySelector(`[data-id="${messageId}"]`);
+            const originalContent = messageDiv.dataset.originalContent;
+            
+            currentLanguage = language; // Track current language
+            
+            try {
+                // If English is selected, show original content
+                if (language === 'english') {
+                    messageDiv.querySelector('div').innerHTML = originalContent;
+                    messageTranslations.set(messageId, originalContent);
+                    return;
+                }
+                
+                const languageMap = {
+                    'hindi': 'Hindi',
+                    'tamil': 'Tamil', 
+                    'bengali': 'Bengali'
+                };
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            role: 'user',
+                            parts: [{text: `Translate to ${languageMap[language]}: ${originalContent}`}]
+                        }],
+                        generationConfig: {
+                            maxOutputTokens: 200
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                const translatedText = data.candidates[0].content.parts[0].text;
+                messageDiv.querySelector('div').innerHTML = translatedText;
+                messageTranslations.set(messageId, translatedText);
+            } catch (error) {
+                console.error('Translation failed:', error);
+            }
+        }
+
+        // Text-to-Speech with language support and pause/resume
+        function speakMessage(messageId) {
+            const messageDiv = document.querySelector(`[data-id="${messageId}"]`);
+            const text = messageDiv.querySelector('div').textContent;
+            
+            if ('speechSynthesis' in window) {
+                // Stop any current speech
+                speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.8;
+                
+                // Get the best available voice for the selected language
+                const voices = speechSynthesis.getVoices();
+                const preferredLangs = voiceMapping[currentLanguage] || ['en-US'];
+                
+                let targetVoice = null;
+                for (const lang of preferredLangs) {
+                    targetVoice = voices.find(voice => voice.lang === lang);
+                    if (targetVoice) break;
+                    
+                    // Try partial match
+                    targetVoice = voices.find(voice => voice.lang.startsWith(lang.split('-')[0]));
+                    if (targetVoice) break;
+                }
+                
+                if (targetVoice) {
+                    utterance.voice = targetVoice;
+                    utterance.lang = targetVoice.lang;
+                } else {
+                    utterance.lang = preferredLangs[0];
+                }
+                
+                // Store current utterance
+                currentUtterance = utterance;
+                speechPaused = false;
+                
+                // Show control buttons
+                const pauseBtn = document.getElementById(`pauseBtn-${messageId}`);
+                const stopBtn = document.getElementById(`stopBtn-${messageId}`);
+                if (pauseBtn) pauseBtn.style.display = 'inline-block';
+                if (stopBtn) stopBtn.style.display = 'inline-block';
+                
+                // Event handlers
+                utterance.onend = () => {
+                    currentUtterance = null;
+                    speechPaused = false;
+                    // Hide control buttons
+                    if (pauseBtn) pauseBtn.style.display = 'none';
+                    if (stopBtn) stopBtn.style.display = 'none';
+                };
+                
+                utterance.onerror = () => {
+                    currentUtterance = null;
+                    speechPaused = false;
+                    // Hide control buttons
+                    if (pauseBtn) pauseBtn.style.display = 'none';
+                    if (stopBtn) stopBtn.style.display = 'none';
+                };
+                
+                speechSynthesis.speak(utterance);
+            } else {
+                alert('Text-to-speech not supported in your browser');
+            }
+        }
+        
+        // Pause/Resume speech function
+        function pauseResumeMessage(messageId) {
+            if (!currentUtterance) return;
+            
+            const pauseBtn = document.getElementById(`pauseBtn-${messageId}`);
+            
+            if (speechSynthesis.paused || speechPaused) {
+                speechSynthesis.resume();
+                speechPaused = false;
+                if (pauseBtn) {
+                    pauseBtn.innerHTML = '⏸️';
+                    pauseBtn.title = 'Pause';
+                }
+            } else {
+                speechSynthesis.pause();
+                speechPaused = true;
+                if (pauseBtn) {
+                    pauseBtn.innerHTML = '▶️';
+                    pauseBtn.title = 'Resume';
+                }
+            }
+        }
+        
+        // Stop speech function
+        function stopSpeech() {
+            speechSynthesis.cancel();
+            currentUtterance = null;
+            speechPaused = false;
+            
+            // Hide all control buttons
+            document.querySelectorAll('[id^="pauseBtn-"], [id^="stopBtn-"]').forEach(btn => {
+                btn.style.display = 'none';
+            });
+            
+            // Hide global control buttons
+            const globalPauseBtn = document.getElementById('globalPauseBtn');
+            const globalStopBtn = document.getElementById('globalStopBtn');
+            if (globalPauseBtn) globalPauseBtn.style.display = 'none';
+            if (globalStopBtn) globalStopBtn.style.display = 'none';
+            
+            // Reset pause button text
+            document.querySelectorAll('[id^="pauseBtn-"]').forEach(btn => {
+                btn.innerHTML = '⏸️';
+                btn.title = 'Pause';
+            });
+            
+            if (globalPauseBtn) {
+                globalPauseBtn.innerHTML = '⏸️';
+                globalPauseBtn.title = 'Pause';
+            }
+        }
+        
+        // Global pause/resume function
+        function pauseResumeCurrent() {
+            if (!currentUtterance) return;
+            
+            const globalPauseBtn = document.getElementById('globalPauseBtn');
+            
+            if (speechSynthesis.paused || speechPaused) {
+                speechSynthesis.resume();
+                speechPaused = false;
+                if (globalPauseBtn) {
+                    globalPauseBtn.innerHTML = '⏸️';
+                    globalPauseBtn.title = 'Pause';
+                }
+                // Update message-specific pause buttons too
+                document.querySelectorAll('[id^="pauseBtn-"]').forEach(btn => {
+                    btn.innerHTML = '⏸️';
+                    btn.title = 'Pause';
+                });
+            } else {
+                speechSynthesis.pause();
+                speechPaused = true;
+                if (globalPauseBtn) {
+                    globalPauseBtn.innerHTML = '▶️';
+                    globalPauseBtn.title = 'Resume';
+                }
+                // Update message-specific pause buttons too
+                document.querySelectorAll('[id^="pauseBtn-"]').forEach(btn => {
+                    btn.innerHTML = '▶️';
+                    btn.title = 'Resume';
+                });
+            }
+        }
+        
+        // Function to speak selected text with controls
+        function speakSelectedText() {
+            if (!selectedText) return;
+            
+            if ('speechSynthesis' in window) {
+                // Stop any current speech
+                speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(selectedText);
+                utterance.rate = 0.8;
+                
+                // Get the best available voice for the selected language
+                const voices = speechSynthesis.getVoices();
+                const preferredLangs = voiceMapping[currentLanguage] || ['en-US'];
+                
+                let targetVoice = null;
+                for (const lang of preferredLangs) {
+                    targetVoice = voices.find(voice => voice.lang === lang);
+                    if (targetVoice) break;
+                    
+                    // Try partial match
+                    targetVoice = voices.find(voice => voice.lang.startsWith(lang.split('-')[0]));
+                    if (targetVoice) break;
+                }
+                
+                if (targetVoice) {
+                    utterance.voice = targetVoice;
+                    utterance.lang = targetVoice.lang;
+                } else {
+                    utterance.lang = preferredLangs[0];
+                }
+                
+                // Store current utterance
+                currentUtterance = utterance;
+                speechPaused = false;
+                
+                // Event handlers
+                utterance.onend = () => {
+                    currentUtterance = null;
+                    speechPaused = false;
+                    // Hide global control buttons
+                    if (globalPauseBtn) globalPauseBtn.style.display = 'none';
+                    if (globalStopBtn) globalStopBtn.style.display = 'none';
+                };
+                
+                utterance.onerror = () => {
+                    currentUtterance = null;
+                    speechPaused = false;
+                    // Hide global control buttons
+                    if (globalPauseBtn) globalPauseBtn.style.display = 'none';
+                    if (globalStopBtn) globalStopBtn.style.display = 'none';
+                };
+                
+                speechSynthesis.speak(utterance);
+                
+                // Show global control buttons
+                const globalPauseBtn = document.getElementById('globalPauseBtn');
+                const globalStopBtn = document.getElementById('globalStopBtn');
+                if (globalPauseBtn) globalPauseBtn.style.display = 'inline-block';
+                if (globalStopBtn) globalStopBtn.style.display = 'inline-block';
+                
+                // Keep selection popup open but update its content
+                // Hide the selection popup after starting speech
+                // document.getElementById('selectionPopup').style.display = 'none';
+            } else {
+                alert('Text-to-speech not supported in your browser');
+            }
+        }
+
+        // Document Analysis Function
+        async function analyzeDocument() {
+            if (!currentDocument) {
+                alert('Please upload a document first');
+                return;
+            }
+            
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<div class="spinner"></div> Analyzing...';
+            
+            try {
+                // First, get AI analysis of the document
+                const analysisPrompt = `
+Analyze this legal document comprehensively and provide a detailed JSON response with the following structure:
+
+{
+  "summary": "Brief overview of the document",
+  "documentType": "Type of legal document",
+  "keyClauses": [
+    {
+      "clause": "Clause title/description",
+      "content": "Actual clause text or reference",
+      "importance": "high/medium/low",
+      "explanation": "What this clause means"
+    }
+  ],
+  "issues": [
+    {
+      "type": "spelling/grammar/legal/unfair/unclear",
+      "text": "Exact problematic text",
+      "issue": "Description of the issue",
+      "suggestion": "How to fix it",
+      "severity": "high/medium/low"
+    }
+  ],
+  "unfairClauses": [
+    {
+      "clause": "Unfair clause text",
+      "reason": "Why this clause is unfair",
+      "impact": "Potential impact on parties",
+      "suggestion": "Fairer alternative"
+    }
+  ],
+  "recommendations": [
+    "List of overall recommendations for improvement"
+  ]
+}
+
+Document to analyze:
+${currentDocument}
+
+Please identify:
+1. All key clauses and their significance
+2. Any spelling mistakes, grammatical errors, or unclear language
+3. Legal issues or problematic terms
+4. Clauses that are unfair according to standard legal practices
+5. Missing important clauses
+6. Recommendations for improvement
+
+Be thorough and specific in your analysis.`;
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            role: 'user',
+                            parts: [{text: analysisPrompt}]
+                        }],
+                        generationConfig: {
+                            maxOutputTokens: 2048,
+                            temperature: 0.3
+                        }
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const analysisText = data.candidates[0].content.parts[0].text;
+                
+                // Try to parse JSON, fallback to text processing
+                let analysis;
+                try {
+                    // Clean the response to extract JSON
+                    const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        analysis = JSON.parse(jsonMatch[0]);
+                    } else {
+                        throw new Error('No JSON found');
+                    }
+                } catch (parseError) {
+                    // Fallback: create structured analysis from text
+                    analysis = parseAnalysisText(analysisText);
+                }
+                
+                // Highlight issues in the document
+                highlightDocumentIssues(analysis.issues || []);
+                
+                // Display analysis results in chat
+                displayAnalysisResults(analysis);
+                
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                addMessage('ai', 'Sorry, I encountered an error while analyzing the document. Please try again.');
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = '🔍 Analyze Document';
+            }
+        }
+        
+        // Parse analysis text when JSON parsing fails
+        function parseAnalysisText(text) {
+            return {
+                summary: "Document analysis completed",
+                documentType: "Legal Document",
+                keyClauses: [],
+                issues: extractIssuesFromText(text),
+                unfairClauses: [],
+                recommendations: ["Please review the detailed analysis provided"]
+            };
+        }
+        
+        // Extract issues from analysis text
+        function extractIssuesFromText(text) {
+            const issues = [];
+            const lines = text.split('\n');
+            
+            lines.forEach(line => {
+                if (line.toLowerCase().includes('error') || 
+                    line.toLowerCase().includes('mistake') || 
+                    line.toLowerCase().includes('issue') ||
+                    line.toLowerCase().includes('unfair') ||
+                    line.toLowerCase().includes('problem')) {
+                    issues.push({
+                        type: 'general',
+                        text: line.trim(),
+                        issue: 'Potential issue identified',
+                        suggestion: 'Review and consider revision',
+                        severity: 'medium'
+                    });
+                }
+            });
+            
+            return issues;
+        }
+        
+        // Highlight issues in the document
+        function highlightDocumentIssues(issues) {
+            const documentText = document.getElementById('documentText');
+            if (!documentText || !issues.length) return;
+            
+            let content = documentText.innerHTML;
+            
+            issues.forEach((issue, index) => {
+                if (issue.text && issue.text.length > 3) {
+                    const searchText = issue.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape regex chars
+                    const regex = new RegExp(`(${searchText})`, 'gi');
+                    content = content.replace(regex, 
+                        `<span class="document-issue" data-issue="${index}" 
+                              onmouseover="showIssueTooltip(event, ${index})" 
+                              onmouseout="hideIssueTooltip()">$1</span>`);
+                }
+            });
+            
+            documentText.innerHTML = content;
+            
+            // Store issues for tooltip reference
+            window.documentIssues = issues;
+        }
+        
+        // Display comprehensive analysis results
+        function displayAnalysisResults(analysis) {
+            let analysisMessage = `# 🔍 Document Analysis Results\n\n`;
+            
+            if (analysis.summary) {
+                analysisMessage += `## Summary\n${analysis.summary}\n\n`;
+            }
+            
+            if (analysis.documentType) {
+                analysisMessage += `**Document Type:** ${analysis.documentType}\n\n`;
+            }
+            
+            if (analysis.keyClauses && analysis.keyClauses.length > 0) {
+                analysisMessage += `## 📜 Key Clauses\n`;
+                analysis.keyClauses.forEach((clause, i) => {
+                    analysisMessage += `${i + 1}. **${clause.clause}** (${clause.importance} importance)\n`;
+                    analysisMessage += `   ${clause.explanation}\n\n`;
+                });
+            }
+            
+            if (analysis.issues && analysis.issues.length > 0) {
+                analysisMessage += `## ⚠️ Issues Found (${analysis.issues.length})\n`;
+                analysis.issues.forEach((issue, i) => {
+                    const severityIcon = issue.severity === 'high' ? '🔴' : issue.severity === 'medium' ? '🟡' : '🟢';
+                    analysisMessage += `${severityIcon} **${issue.type.toUpperCase()}**: ${issue.issue}\n`;
+                    if (issue.suggestion) {
+                        analysisMessage += `   *Suggestion: ${issue.suggestion}*\n`;
+                    }
+                    analysisMessage += `\n`;
+                });
+            }
+            
+            if (analysis.unfairClauses && analysis.unfairClauses.length > 0) {
+                analysisMessage += `## ⚖️ Unfair Clauses\n`;
+                analysis.unfairClauses.forEach((clause, i) => {
+                    analysisMessage += `${i + 1}. **Issue:** ${clause.reason}\n`;
+                    analysisMessage += `   **Impact:** ${clause.impact}\n`;
+                    analysisMessage += `   **Suggestion:** ${clause.suggestion}\n\n`;
+                });
+            }
+            
+            if (analysis.recommendations && analysis.recommendations.length > 0) {
+                analysisMessage += `## 💡 Recommendations\n`;
+                analysis.recommendations.forEach((rec, i) => {
+                    analysisMessage += `${i + 1}. ${rec}\n`;
+                });
+            }
+            
+            analysisMessage += `\n---\n*Analysis completed. Issues highlighted in red in the document above.*`;
+            
+            addMessage('ai', analysisMessage);
+        }
+        
+        // Tooltip functions for issue highlighting
+        function showIssueTooltip(event, issueIndex) {
+            if (!window.documentIssues || !window.documentIssues[issueIndex]) return;
+            
+            const issue = window.documentIssues[issueIndex];
+            let tooltip = document.getElementById('issueTooltip');
+            
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.id = 'issueTooltip';
+                tooltip.className = 'issue-tooltip';
+                document.body.appendChild(tooltip);
+            }
+            
+            tooltip.innerHTML = `<strong>${issue.type.toUpperCase()}</strong><br>${issue.issue}<br><em>${issue.suggestion}</em>`;
+            tooltip.style.display = 'block';
+            tooltip.style.left = event.pageX + 10 + 'px';
+            tooltip.style.top = event.pageY - 10 + 'px';
+        }
+        
+        function hideIssueTooltip() {
+            const tooltip = document.getElementById('issueTooltip');
+            if (tooltip) {
+                tooltip.style.display = 'none';
+            }
+        }
+        
+        // Document redrafting
+        async function redraftDocument() {
+            if (!currentDocument) {
+                alert('Please upload a document first');
+                return;
+            }
+
+            try {
+                const suggestions = chatHistory.map(msg => msg.content).join('\n');
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            role: 'user',
+                            parts: [{text: `Redraft this legal document for clarity:\n\nOriginal:\n${currentDocument}\n\nSuggestions from chat:\n${suggestions}`}]
+                        }],
+                        generationConfig: {
+                            maxOutputTokens: 800
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                const redraftedContent = data.candidates[0].content.parts[0].text;
+                
+                document.getElementById('redraftedContent').innerHTML = redraftedContent.replace(/\n/g, '<br>');
+                document.getElementById('redraftModal').classList.add('active');
+            } catch (error) {
+                alert('Redrafting failed. Please try again.');
+            }
+        }
+
+        // Utility functions
+        function toggleDropdown(button) {
+            const dropdown = button.parentElement;
+            dropdown.classList.toggle('active');
+            
+            // Close other dropdowns
+            document.querySelectorAll('.dropdown').forEach(d => {
+                if (d !== dropdown) d.classList.remove('active');
+            });
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+            if (modalId === 'queryModal') {
+                document.getElementById('contextQuery').value = '';
+            }
+        }
+
+        function copyToClipboard() {
+            const content = document.getElementById('redraftedContent').textContent;
+            navigator.clipboard.writeText(content).then(() => {
+                alert('Copied to clipboard!');
+            });
+        }
+
+        function downloadRedraft() {
+            const content = document.getElementById('redraftedContent').textContent;
+            const blob = new Blob([content], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'redrafted_document.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.dropdown')) {
+                document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
+            }
+        });
+
+        // Close selection popup when clicking elsewhere
+        document.addEventListener('click', function(e) {
+            const popup = document.getElementById('selectionPopup');
+            
+            // Only hide popup if not clicking on popup itself, document viewer, or input elements
+            if (popup && 
+                !e.target.closest('#selectionPopup') && 
+                !e.target.closest('#documentViewer') &&
+                !e.target.closest('input') &&
+                !e.target.closest('textarea') &&
+                !e.target.closest('button')) {
+                popup.style.display = 'none';
+            }
+        });
+    </script>
+
+</body></html>
